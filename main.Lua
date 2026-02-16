@@ -288,10 +288,7 @@ minimizeButton.MouseButton1Up:Connect(function()
 	openbutton.Visible = true
 end)
 
-closebutton.MouseButton1Up:Connect(function()
-	ui:Destroy()
-	script:Destroy()
-end)
+
 
 local espopen = false
 local Lootespopen = false
@@ -325,7 +322,7 @@ local function ToggleLootESP(toggle)
 		if obj.Inventory:FindFirstChild("SPSh-44") then
 			HighlightColor = Color3.new(1, 0, 0.0156863)
 		else 
-			for _,item in ipairs(obj.Inventory:GetDesendants()) do
+			for _,item in ipairs(obj.Inventory:GetDescendants()) do
 				if item.Name == "LoadedAmmo" then
 					HighlightColor = Color3.new(0.92549, 0.831373, 0.109804)
 					break
@@ -379,8 +376,8 @@ local function ToggleESP(toggle)
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "ESP_Health"
 		gui.Adornee = head
-		gui.Size = UDim2.fromScale(4, 0.5)
-		gui.StudsOffset = Vector3.new(0, 3, 0)
+		gui.Size = UDim2.fromScale(2, 0.3)
+		gui.StudsOffset = Vector3.new(0, 2, 0)
 		gui.AlwaysOnTop = true
 		gui.Parent = head
 
@@ -460,4 +457,11 @@ end)
 lootEspButton.MouseButton1Click:Connect(function()
 	Lootespopen = not Lootespopen
 	ToggleLootESP(Lootespopen)
+end)
+
+closebutton.MouseButton1Up:Connect(function()
+	ui:Destroy()
+	ToggleESP(false)
+	ToggleLootESP(false)
+	script:Destroy()
 end)
