@@ -197,6 +197,10 @@ local function ToggleLootESP(toggle)
 
 		local char = getPlayerCharacter()
 		if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+		
+		if obj:FindFirstChild("LootESP") then
+			obj.LootESP:Destroy()
+		end
 
 		local playerPos = char.HumanoidRootPart.Position
 		local lootPos = obj:GetPivot().Position
@@ -236,12 +240,16 @@ local function ToggleLootESP(toggle)
 	for _, obj in ipairs(workspace:GetDescendants()) do
 		if obj:IsA("Model") then
 			AddLootHighlight(obj)
+			obj.ChildAdded:Connect(AddLootHighlight(obj))
+			obj.ChildRemoved:Connect(AddLootHighlight(obj))
 		end
 	end
 
 	workspace.DescendantAdded:Connect(function(obj)
 		if obj:IsA("Model") then
 			AddLootHighlight(obj)
+			obj.ChildAdded:Connect(AddLootHighlight(obj))
+			obj.ChildRemoved:Connect(AddLootHighlight(obj))
 		end
 	end)
 
@@ -261,6 +269,14 @@ local function ToggleLootESP(toggle)
 						if not hasSPSh and dist > 600 then
 							hl:Destroy()
 							table.remove(Lootinstances, i)
+							
+							task.spawn(function()
+								while (playerPos - lootPos).Magnitude > 600 do
+									wait(4)
+								end
+								
+								AddLootHighlight(obj)
+							end)
 						end
 					else
 						table.remove(Lootinstances, i)
@@ -294,7 +310,7 @@ local function ToggleESP(toggle)
 		gui.AlwaysOnTop = true
 		gui.ClipsDescendants = false
 		gui.LightInfluence = 0
-		gui.MaxDistance = 2500
+		gui.MaxDistance = 9999999
 		gui.Parent = head
 
 		local Namegui = Instance.new("BillboardGui")
@@ -305,15 +321,14 @@ local function ToggleESP(toggle)
 		Namegui.AlwaysOnTop = true
 		Namegui.ClipsDescendants = false
 		Namegui.LightInfluence = 0
-		Namegui.MaxDistance = 2500
+		Namegui.MaxDistance = 9999999
 		Namegui.Parent = head
 
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Name = "ESP_Name"
-		nameLabel.Size = UDim2.fromScale(1, 0.55)
+		nameLabel.Size = UDim2.fromScale(0.8, 0.55)
 		nameLabel.Position = UDim2.fromScale(0, 0.1)
 		nameLabel.BackgroundTransparency = 1
-		nameLabel.Text = character.Name
 		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 		nameLabel.TextStrokeTransparency = 0
 		nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -342,15 +357,43 @@ local function ToggleESP(toggle)
 		local healthBarCorner = Instance.new("UICorner")
 		healthBarCorner.CornerRadius = UDim.new(0, 8)
 		healthBarCorner.Parent = healthBar
+		
+		local localPlayer = game.Players.LocalPlayer
+		local localChar = localPlayer.Character
+
+		if localChar and localChar:FindFirstChild("HumanoidRootPart") 
+			and character:FindFirstChild("HumanoidRootPart") then
+
+			local dist = (localChar.HumanoidRootPart.Position - character.HumanoidRootPart.Position).Magnitude
+
+			nameLabel.Text = character.Name .. "  " .. math.floor(dist)
+		end
+
+		
+		task.spawn(function()
+			local RunService = game:GetService("RunService")
+
+			RunService.RenderStepped:Connect(function()
+				if not localChar or not localChar.Parent then return end
+
+				local myHRP = localChar:FindFirstChild("HumanoidRootPart")
+				local targetHRP = character:FindFirstChild("HumanoidRootPart")
+				if not myHRP or not targetHRP then return end
+
+				local dist = (myHRP.Position - targetHRP.Position).Magnitude
+
+				nameLabel.Text = character.Name .. "  [" .. math.floor(dist) .. "m]"
+			end)
+		end)
 
 		local function updateHealth()
-			
+
 			if humanoid.Health <= 0 then
 				gui:Destroy()
 				Namegui:Destroy()
 				return
 			end
-			
+
 			local healthPct = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
 			healthBar.Size = UDim2.fromScale(healthPct, 1)
 			healthBar.BackgroundColor3 = Color3.fromRGB(
@@ -371,6 +414,7 @@ local function ToggleESP(toggle)
 		if not character:FindFirstChildOfClass("Humanoid") then return end
 		if character:FindFirstChildOfClass("Highlight") then return end
 		if character == getPlayerCharacter() then return end
+		if character == game.Players.LocalPlayer.Character then return end
 
 		local highlight = Instance.new("Highlight")
 		highlight.Name = "ESP"
