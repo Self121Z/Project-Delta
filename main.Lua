@@ -171,7 +171,22 @@ local Weapons = {
 	"YakB",
 }
 
+local RunService = game:GetService("RunService")
+local RANGE = 600
+
+local function getHRP()
+	local char = game.Players.LocalPlayer.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local LootUpdateConn
+
 local function ToggleLootESP(toggle)
+	if LootUpdateConn then
+		LootUpdateConn:Disconnect()
+		LootUpdateConn = nil
+	end
+
 	if not toggle then
 		for _, data in pairs(Lootinstances) do
 			if data and data.highlight then
@@ -182,86 +197,104 @@ local function ToggleLootESP(toggle)
 		return
 	end
 
-	local function AddLootHighlight(obj)
-		if not obj:IsA("Model") then return end
-		if obj:FindFirstChildOfClass("Highlight") then return end
-		if not obj:FindFirstChild("Inventory") then return end
+	local function getLootHighlight(model)
+		for _, data in ipairs(Lootinstances) do
+			if data.obj == model then
+				return data.highlight
+			end
+		end
+		return nil
+	end
 
-		local char = getPlayerCharacter()
-		if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-		
-		if obj:FindFirstChild("LootESP") then
-			obj.LootESP:Destroy()
+	local function calcColor(inv)
+		if #inv:GetChildren() == 0 then
+			return Color3.new(0.372549, 0.254902, 0.219608)
 		end
 
-		local playerPos = char.HumanoidRootPart.Position
-		local lootPos = obj:GetPivot().Position
-		local distance = (playerPos - lootPos).Magnitude
+		if inv:FindFirstChild("SPSh-44") then
+			return Color3.new(1, 0, 0.0156863)
+		end
 
-		local inv = obj.Inventory
-		local hasSPSh = inv:FindFirstChild("SPSh-44")
-
-		if not hasSPSh and distance > 600 then return end
-
-		local HighlightColor
-		if #inv:GetChildren() == 0 then
-			HighlightColor = Color3.new(0.372549, 0.254902, 0.219608)
-		elseif hasSPSh then
-			HighlightColor = Color3.new(1, 0, 0.0156863)
-		else
-			for _, item in ipairs(inv:GetDescendants()) do
-				if table.find(Weapons, item.Name) then
-					HighlightColor = Color3.new(0.92549, 0.831373, 0.109804)
-					break
-				end
+		for _, item in ipairs(inv:GetDescendants()) do
+			if table.find(Weapons, item.Name) then
+				return Color3.new(0.92549, 0.831373, 0.109804)
 			end
 		end
 
-		local highlight = Instance.new("Highlight")
-		highlight.Name = "LootESP"
-		highlight.Adornee = obj
-		highlight.Parent = obj
-		highlight.FillColor = HighlightColor or Color3.new(0.458824, 0.588235, 0.109804)
-		highlight.OutlineColor = Color3.new(0, 0, 0)
-		highlight.FillTransparency = 0.50
-		highlight.OutlineTransparency = 0.6
+		return Color3.new(0.458824, 0.588235, 0.109804)
+	end
 
-		table.insert(Lootinstances, {highlight = highlight, obj = obj})
+	local function AddOrUpdateLoot(model)
+		if not model:IsA("Model") then return end
+		local inv = model:FindFirstChild("Inventory")
+		if not inv then return end
+
+		local hl = model:FindFirstChild("LootESP")
+		if not hl then
+			hl = Instance.new("Highlight")
+			hl.Name = "LootESP"
+			hl.Adornee = model
+			hl.Parent = model
+			hl.OutlineColor = Color3.new(0, 0, 0)
+			hl.FillTransparency = 0.50
+			hl.OutlineTransparency = 0.6
+
+			table.insert(Lootinstances, {highlight = hl, obj = model})
+		end
+
+		hl.FillColor = calcColor(inv)
 	end
 
 	for _, obj in ipairs(workspace:GetDescendants()) do
 		if obj:IsA("Model") then
-			AddLootHighlight(obj)
-			obj.ChildAdded:Connect(AddLootHighlight(obj))
-			obj.ChildRemoved:Connect(AddLootHighlight(obj))
+			AddOrUpdateLoot(obj)
+
+			obj.ChildAdded:Connect(function()
+				AddOrUpdateLoot(obj)
+			end)
+
+			obj.ChildRemoved:Connect(function()
+				AddOrUpdateLoot(obj)
+			end)
 		end
 	end
 
 	workspace.DescendantAdded:Connect(function(obj)
 		if obj:IsA("Model") then
-			AddLootHighlight(obj)
-			obj.ChildAdded:Connect(AddLootHighlight(obj))
-			obj.ChildRemoved:Connect(AddLootHighlight(obj))
+			AddOrUpdateLoot(obj)
+
+			obj.ChildAdded:Connect(function()
+				AddOrUpdateLoot(obj)
+			end)
+
+			obj.ChildRemoved:Connect(function()
+				AddOrUpdateLoot(obj)
+			end)
 		end
 	end)
 
-	spawn(function()
-		RunService.RenderStepped:Connect(function()
-			local hrp = getHRP()
-			if not hrp then return end
+	LootUpdateConn = RunService.RenderStepped:Connect(function()
+		local hrp = getHRP()
+		if not hrp then return end
 
-			for _, obj in ipairs(Lootinstances) do
-				if obj:IsA("Highlight") then
-					local hl = obj
+		for i = #Lootinstances, 1, -1 do
+			local data = Lootinstances[i]
+			local hl = data.highlight
+			local loot = data.obj
 
-					local dist = (hrp.Position - obj.Parent:GetPivot().Position).Magnitude
+			if not hl or not hl.Parent or not loot or not loot.Parent then
+				table.remove(Lootinstances, i)
+			else
+				local inv = loot:FindFirstChild("Inventory")
+				local hasSPSh = inv and inv:FindFirstChild("SPSh-44") ~= nil
+				local dist = (hrp.Position - loot:GetPivot().Position).Magnitude
 
-					hl.Enabled = (dist <= RANGE)
-				end
+				hl.Enabled = hasSPSh or (dist <= RANGE)
 			end
 		end
 	end)
 end
+
 
 local function ToggleESP(toggle)
 	if not toggle then
