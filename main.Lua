@@ -246,36 +246,19 @@ local function ToggleLootESP(toggle)
 	end)
 
 	spawn(function()
-		while Lootespopen do
-			local char = getPlayerCharacter()
-			if char and char:FindFirstChild("HumanoidRootPart") then
-				local playerPos = char.HumanoidRootPart.Position
-				for i = #Lootinstances, 1, -1 do
-					local data = Lootinstances[i]
-					local hl = data.highlight
-					local obj = data.obj
-					if hl and hl.Parent and obj and obj.Parent then
-						local lootPos = obj:GetPivot().Position
-						local dist = (playerPos - lootPos).Magnitude
-						local hasSPSh = obj.Inventory and obj.Inventory:FindFirstChild("SPSh-44")
-						if not hasSPSh and dist > 600 then
-							hl:Destroy()
-							table.remove(Lootinstances, i)
-							
-							task.spawn(function()
-								while (playerPos - lootPos).Magnitude > 600 do
-									wait(4)
-								end
-								
-								AddLootHighlight(obj)
-							end)
-						end
-					else
-						table.remove(Lootinstances, i)
-					end
+		RunService.RenderStepped:Connect(function()
+			local hrp = getHRP()
+			if not hrp then return end
+
+			for _, obj in ipairs(Lootinstances) do
+				if obj:IsA("Highlight") then
+					local hl = obj
+
+					local dist = (hrp.Position - obj.Parent:GetPivot().Position).Magnitude
+
+					hl.Enabled = (dist <= RANGE)
 				end
 			end
-			task.wait(1)
 		end
 	end)
 end
